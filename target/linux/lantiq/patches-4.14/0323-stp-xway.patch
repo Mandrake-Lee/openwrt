@@ -1,0 +1,21 @@
+--- /drivers/gpio/gpio-stp-xway.c
++++ /drivers/gpio/gpio-stp-xway.c
+@@ -264,12 +264,16 @@
+ 	if (!of_find_property(pdev->dev.of_node, "lantiq,rising", NULL))
+ 		chip->edge = XWAY_STP_FALLING;
+ 
+-	clk = clk_get(&pdev->dev, NULL);
++	if (of_machine_is_compatible("lantiq,vr9"))
++		clk = of_clk_get(pdev->dev.of_node,0);
++	else
++		clk = clk_get(&pdev->dev, NULL);
++
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "Failed to get clock\n");
+ 		return PTR_ERR(clk);
+ 	}
+-	clk_enable(clk);
++	clk_prepare_enable(clk);
+ 
+ 	ret = xway_stp_hw_init(chip);
+ 	if (!ret)

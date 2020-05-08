@@ -1,0 +1,223 @@
+--- /dev/null
++++ /drivers/clk/lantiq/clk-xway-mmio-mux.c
+@@ -0,0 +1,220 @@
++// SPDX-License-Identifier: GPL-2.0
++
++/*
++ * clk-xway-mmio-mux.c
++ * OF driver for Lantiq mux'ed clock signals controlled via MMIO register
++ * 
++ * This driver multiplex one or several clock inputs into a single
++ * clock output given the value stored in a register.
++ *
++ * It completely relies on clk_mux api and given it's flexible nature
++ * can be re-used for other platforms, not just Lantiq
++ *
++ * Copyright (C) 2020 Jorge Amorós-Argos <jamoros76@gmail.com>
++ */
++
++/*
++ * VERSION HISTORY
++ * 01	May 2020	First release
++ */
++
++#include <linux/module.h>
++#include <linux/clk-provider.h>
++#include <linux/clk.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/string.h>
++#include <linux/version.h>
++
++/*
++ * TODO - WARNING
++ * This driver relies on clk_mux api.
++ * Due to the status of Openwrt (kernel 4.14), some pull-ahead changes from kernel 5.5
++ * especially the big endian support and the index lookup had to be taken here and also
++ * patched on clk_mux.c
++ * This is a very awkward solution but it is just a matter of patiente
++ * Also the set_parent operation doesn't work (doesn't write the register)
++ * With newer kernels (>5), this code should be revised
++*/
++#ifndef CLK_MUX_BIG_ENDIAN
++
++#define CLK_MUX_BIG_ENDIAN BIT(5)
++
++#endif
++
++/*
++ * These are the columns inside the matrix (aka offset)
++ */
++enum 	{MUX_TABLE_VAL, MUX_CLK_PARENT, MUX_MATRIX_COLUMNS};
++
++static struct clk_hw *_of_ltq_xway_mmio_mux_clk_setup(struct device_node *node)
++{
++	struct clk_hw *hw;
++	void __iomem *base;
++	const char *clk_name = node->name;
++	u8 clk_mux_flags = 0;
++	u32 mask, shift;
++	u32 *table;
++	u32 reg_val;
++	const char **parent_names;
++	int i, index_base, ret, auxval;
++	u8 n_rows, n_cols;
++
++	/*Sanity checks*/
++	if (of_property_read_u32(node, "lantiq,mux-table", &auxval)) {
++		pr_err("%pOF: Lantiq MMIO mux clock must have a 'lantiq,mux-clocks' property\n",
++			node);
++		return ERR_PTR(-EIO);
++	}
++
++	if (of_property_read_u32(node, "#lantiq,mux-table-cells", &auxval)){
++		pr_err("%pOF: Lantiq MMIO mux clock must have a '#lantiq,mux-table-cells' property\n",
++			node);
++		return ERR_PTR(-EIO);	
++	}
++
++	n_cols = (u8) auxval;
++	n_rows = of_property_count_elems_of_size( node, "lantiq,mux-table", n_cols*sizeof(u32));
++
++	/* Grab the register location */
++	base = of_iomap(node, 0);
++
++	if (!base){
++		pr_err("%pOFn: failed to map address\n", node);
++		return ERR_PTR(-EIO);
++	}
++
++	/*Prepare flags*/
++	clk_mux_flags = CLK_MUX_ROUND_CLOSEST;
++
++	/*Check endianness*/
++	if(of_device_is_big_endian(node))
++		clk_mux_flags |= CLK_MUX_BIG_ENDIAN;
++
++	/* Allocate memory for mux table*/
++	table = kzalloc( sizeof(u32)*n_rows, GFP_KERNEL);
++
++	parent_names = kzalloc( n_rows*sizeof(char*), GFP_KERNEL);
++
++	/*Now run the matrix to link all the information*/
++	for (i=0;i<n_rows;i++)
++	{
++		index_base = i*n_cols;
++
++		/*	MUX_TABLE_VAL	*/
++		of_property_read_u32_index(node, "lantiq,mux-table",
++						 index_base + MUX_TABLE_VAL, &auxval);
++
++		table[i] = auxval;
++
++		/*	MUX_CLK_PARENT	*/
++		of_property_read_u32_index(node, "lantiq,mux-table",
++						 index_base + MUX_CLK_PARENT, &auxval);
++
++		parent_names[i] = of_clk_get_parent_name(node, auxval);
++	}
++
++	/* At this point, all the info is captured, just get the final data */
++	of_property_read_string_index(node, "clock-output-names", 0, &clk_name);
++	of_property_read_u32_index(node, "lantiq,mux-mask", 0 , &mask);
++	of_property_read_u32_index(node, "lantiq,mux-shift", 0 , &shift);
++
++	hw = clk_hw_register_mux_table(NULL, clk_name, parent_names, n_rows,
++					0, base, shift, mask, clk_mux_flags,
++					table, NULL);
++
++	if (IS_ERR(hw)){
++		pr_err("%pOFn: clk %d couldn't be allocated", node);
++		return hw;
++	}
++
++	/*Write the default mux value in the register if stated*/
++	if (!of_property_read_u32(node, "lantiq,mux-default-val", &auxval)){
++		clk_mux_ops.set_parent(hw, (u8) auxval);
++
++		/* The operation above doesn't write in the register so we need to force it
++		 * This is something to be checked with newer kernels
++		 */
++
++		if (!of_device_is_big_endian(node))
++			reg_val = readl(base);	
++		else
++			reg_val = ioread32be(base);
++
++		iowrite32be((reg_val & ~(mask<<shift)) | (auxval<<shift), base);
++	}
++
++
++	ret = of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw);
++
++	if (ret) {
++		pr_err("%pOFn: failed to add clock provider\n", node);
++		of_clk_del_provider(node);
++		return ERR_PTR(ret);
++	}	
++
++	return hw;
++}
++
++/**
++ * of_ltq_xway_mmio_mux_clk_setup() - Setup function for xway MMIO multiplex clock
++ */
++void __init of_ltq_xway_mmio_mux_clk_setup(struct device_node *node)
++{
++	_of_ltq_xway_mmio_mux_clk_setup(node);
++}
++
++CLK_OF_DECLARE(ltq_xway_mmio_mux_clk, "lantiq,mmio-mux-clock",
++		of_ltq_xway_mmio_mux_clk_setup);
++
++static int of_ltq_xway_mmio_mux_clk_remove(struct platform_device *pdev)
++{
++	struct clk *clk = platform_get_drvdata(pdev);
++
++	of_clk_del_provider(pdev->dev.of_node);
++	clk_unregister_mux(clk);
++
++	return 0;
++}
++
++
++static int of_ltq_xway_mmio_mux_clk_probe(struct platform_device *pdev)
++{
++	struct clk *clk;
++
++	/*
++	 * This function is not executed when of_ltq_fixed_factor_mult_clk_setup
++	 * succeeded.
++	 */
++	if(_of_ltq_xway_mmio_mux_clk_setup(pdev->dev.of_node) <0)
++		pr_err("%pOF: Failed to attach 'lantiq,mmio-mux-clock'",pdev->dev.of_node);
++
++	platform_set_drvdata(pdev, clk);
++
++	return 0;
++}
++
++static const struct of_device_id of_ltq_xway_mmio_mux_clk_ids[] = {
++	{ .compatible = "lantiq,mmio-mux-clock" },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(of, of_ltq_xway_mmio_mux_clk_ids);
++
++static struct platform_driver of_ltq_xway_mmio_mux_clk_driver = {
++	.driver = {
++		.name = "of_ltq_xway_mmio_mux_clk",
++		.of_match_table = of_ltq_xway_mmio_mux_clk_ids,
++	},
++	.probe = of_ltq_xway_mmio_mux_clk_probe,
++	.remove = of_ltq_xway_mmio_mux_clk_remove,
++};
++module_platform_driver(of_ltq_xway_mmio_mux_clk_driver);
++
++MODULE_AUTHOR("Jorge Amorós-Argos <jamoros76@gmail.com>");
++MODULE_DESCRIPTION("Lantiq xway MMIO mux clock driver");
++MODULE_LICENSE("GPL v2");
++

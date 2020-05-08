@@ -1,0 +1,399 @@
+--- /dev/null
++++ /drivers/clk/lantiq/clk-xway-pmu.c
+@@ -0,0 +1,396 @@
++// SPDX-License-Identifier: GPL-2.0
++
++/*
++ * clk-xway-pmu.c
++ * OF driver for Lantiq XWAY PMU gating unit
++ *
++ * Copyright (C) 2020 Jorge Amorós-Argos <joramar76@gmail.com>
++ *
++ * Basic functionality for the Lantiq XWAY PMU unit.
++ * So far only for Danube, AR9, ASE and VR9
++ */
++
++/*
++ * VERSION HISTORY
++ * 01	May 2020	First release
++ */
++
++/*
++ * TODO: With minor adjustment, this driver could be used also with AR10
++ * and GRX390 (the enable/disable logic is opposite)
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#ifndef CLK_GATE_BIG_ENDIAN
++#define CLK_GATE_BIG_ENDIAN BIT(2)
++#endif
++
++struct ltq_xway_pmu{
++	struct clk_hw hw;
++	void __iomem *en_ctl_reg;	//Enable control register
++	void __iomem *dis_ctl_reg;	//Disable control register	
++	void __iomem *stat_reg;		//Status register
++	u32 mask_gate;	//Gates are usually 1 bit BUT several can be actioned at once
++	u8 flags;
++	spinlock_t *lock;
++};
++
++#define to_clk_ltq_xway_pmu(_hw) container_of(_hw, struct ltq_xway_pmu, hw)
++
++static DEFINE_SPINLOCK(g_pmu_lock);
++
++static inline u32 clk_pmu_readl(struct ltq_xway_pmu *pmu)
++{
++	if (pmu->flags & CLK_GATE_BIG_ENDIAN)
++		return ioread32be(pmu->stat_reg);
++
++	return readl(pmu->stat_reg);
++}
++
++
++/*
++ * The XWAY PMU works this way only for AR9, ASE, DANUBE and VR9!!
++ * If gate(s) need to be enable, the corresponding bits must be set to 0
++ * in the control register.
++ * On the contrary, if disable, bits must be set to 1
++ * The status register will shadow the control when succeeded
++*/
++static inline void clk_pmu_toggle(struct ltq_xway_pmu *pmu, bool enable)
++{
++	u32 reg_val;
++	void __iomem *reg;
++
++	if (enable)
++		reg = pmu->en_ctl_reg;
++	else
++		reg = pmu->dis_ctl_reg;
++
++	if (pmu->flags & CLK_GATE_BIG_ENDIAN){
++		reg_val = ioread32be(reg);
++		if (enable)
++			iowrite32be( reg_val & ~(pmu->mask_gate), reg);
++		else
++			iowrite32be( reg_val | (pmu->mask_gate), reg);
++	}
++	else {
++		reg_val = readl(reg);
++		if (enable)
++			writel(reg_val & ~(pmu->mask_gate), reg);
++		else
++			writel(reg_val | (pmu->mask_gate), reg);
++	}
++}
++
++/*
++ * Be aware that XWAY for AR9, ASE, DANUBE and VR9 works with inverse logic
++ * If enable, bits are set to 0
++*/
++
++static int ltq_xway_pmu_is_enabled(struct clk_hw *hw){
++	struct ltq_xway_pmu *pmu;
++
++	pmu = to_clk_ltq_xway_pmu(hw);
++
++	return !(clk_pmu_readl(pmu) & pmu->mask_gate);
++	
++}
++
++static int ltq_xway_pmu_enable(struct clk_hw *hw){
++	struct ltq_xway_pmu *pmu;
++	unsigned long uninitialized_var(flags);
++	u32 reg_val;
++	u32 retry = 1000000;
++
++	pmu = to_clk_ltq_xway_pmu(hw);
++
++	if (pmu->lock)
++		spin_lock_irqsave(pmu->lock, flags);
++	else
++		__acquire(pmu->lock);
++
++	/* Power on */
++	clk_pmu_toggle (pmu, 1);
++
++	do{
++		reg_val = clk_pmu_readl(pmu);
++	} while (retry-- && !ltq_xway_pmu_is_enabled(hw));
++
++	if (pmu->lock)
++		spin_unlock_irqrestore(pmu->lock, flags);
++	else
++		__release(pmu->lock);
++	
++	if (!retry){
++		panic("activating PMU module failed!");
++		return -1;
++	}
++
++	return 0;
++}
++
++static void ltq_xway_pmu_disable(struct clk_hw *hw){
++	unsigned long uninitialized_var(flags);
++	struct ltq_xway_pmu *pmu;
++	u32 retry = 1000000;
++
++	pmu = to_clk_ltq_xway_pmu(hw);
++
++	if (pmu->lock)
++		spin_lock_irqsave(pmu->lock, flags);
++	else
++		__acquire(pmu->lock);
++	/* Power off */
++	clk_pmu_toggle (pmu, 0);
++
++	do{
++	} while (retry-- && ltq_xway_pmu_is_enabled(hw));
++
++	if (pmu->lock)
++		spin_unlock_irqrestore(pmu->lock, flags);
++	else
++		__release(pmu->lock);
++	
++	if (!retry){
++		panic("disactivating PMU module failed!");
++		return -1;
++	}
++
++	return 0;
++}
++
++const struct clk_ops ltq_xway_pmu_ops = {
++	.enable = ltq_xway_pmu_enable,
++	.disable = ltq_xway_pmu_disable,
++	.is_enabled = ltq_xway_pmu_is_enabled,
++};
++
++
++
++/**
++ * clk_hw_register_xway_pmu - register a Lantiq XWAY PMU (gate clock) with the clock framework
++ * @dev: device that is registering this clock
++ * @name: name of this clock
++ * @parent_name: name of this clock's parent
++ * @flags: framework-specific flags for this clock
++ * @en_ctl_reg: enable control register address to control gating this clock
++ * @dis_ctl_reg: disable control register address to control gating this clock
++ * @stat_reg: register address to control gating of this clock
++ * @mask_gate: which bits in the register control gating of this clock
++ * @clk_gate_flags: gate-specific flags for this clock
++ * @lock: shared register lock for this clock
++ */
++struct clk_hw *clk_hw_register_ltq_xway_pmu(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *en_ctl_reg, void __iomem *dis_ctl_reg,
++		void __iomem *stat_reg,	u32 mask_gate,
++		u8 clk_gate_flags, spinlock_t *lock)
++{
++
++	struct ltq_xway_pmu *pmu;
++	struct clk_hw *hw;
++	struct clk_init_data init;
++	int ret;
++
++	/* allocate the PMU struct */
++	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
++	if (!pmu)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &ltq_xway_pmu_ops;
++	init.flags = flags | CLK_IS_BASIC | CLK_IGNORE_UNUSED;
++	init.parent_names = parent_name ? &parent_name : NULL;
++	init.num_parents = parent_name ? 1 : 0;
++
++	/* struct ltq_xway_pmu assignments */
++	pmu->en_ctl_reg = en_ctl_reg;
++	pmu->dis_ctl_reg = dis_ctl_reg;
++	pmu->stat_reg = stat_reg;
++	pmu->mask_gate = mask_gate;
++	pmu->flags = clk_gate_flags;
++
++	pmu->lock = lock;
++	pmu->hw.init = &init;
++
++	hw = &pmu->hw;
++	ret = clk_hw_register(dev, hw);
++	if (ret) {
++		kfree(pmu);
++		hw = ERR_PTR(ret);
++	}
++
++	return hw;
++}
++
++void clk_unregister_ltq_xway_pmu(struct clk_hw *hw)
++{
++	struct ltq_xway_pmu *pmu;
++
++	pmu = to_clk_ltq_xway_pmu(hw);
++
++	clk_hw_unregister(hw);
++
++	kfree(pmu);
++}
++
++
++static void *ltq_xway_pmu_clk_setup(struct device_node *node){
++	struct device_node *auxnode;
++	struct clk_hw *hw;
++	void __iomem *stat_reg, *en_ctl_reg, *dis_ctl_reg;
++	const char *clk_name, *parent_name;
++	u32 mask_gate = 0;
++	u32 disconnect_on_boot;
++	u8 clk_gate_flags = 0;
++	u8 n_gates;
++	u32 auxval;
++	int i, ret;
++
++	/* By definition, this driver is declared in DT at the status register */
++	stat_reg = of_iomap(node, 0);
++
++	if (!stat_reg){
++		pr_err("%pOFn: failed to map address\n", node);
++		return ERR_PTR(-EIO);
++	}	
++
++	/* Setup flags*/
++	/* We borrow the flag from clk_gate driver*/
++	if (of_device_is_big_endian(node))
++		clk_gate_flags |= CLK_GATE_BIG_ENDIAN;
++
++	/*Retrieve enable control register*/
++	auxnode = of_parse_phandle(node, "lantiq,pmu-enable-reg",0);
++
++	en_ctl_reg = of_iomap(auxnode, 0);
++
++	if (!en_ctl_reg){
++		pr_err("%pOFn: failed to map PMU enable ctl address\n", node);
++		return ERR_PTR(-EIO);
++	}
++
++	/*Retrieve disable control register*/
++	auxnode = of_parse_phandle(node, "lantiq,pmu-disable-reg",0);
++
++	dis_ctl_reg = of_iomap(auxnode, 0);
++
++	if (!dis_ctl_reg){
++		pr_err("%pOFn: failed to map PMU disable ctl address\n", node);
++		return ERR_PTR(-EIO);
++	}
++
++	/*Retrieve & compose gate_mask*/
++	n_gates = of_property_count_elems_of_size(node, "lantiq,gate-bit-pos", sizeof(u32));
++
++	if (n_gates < 0 )
++		pr_err("%pOFn: Failed to request 'lantiq,gate-bit-pos'", node);
++
++	for (i=0;i<n_gates;i++){
++		of_property_read_u32_index(node, "lantiq,gate-bit-pos", i, &auxval);
++		mask_gate |= (1 << auxval);
++	}
++
++	/*Read clock output name*/
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	/*Read parent name*/
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	/*Create the hw*/
++	hw = clk_hw_register_ltq_xway_pmu( NULL, clk_name, parent_name, CLK_SET_RATE_PARENT,
++						en_ctl_reg, dis_ctl_reg, stat_reg,
++						mask_gate, clk_gate_flags, &g_pmu_lock);
++
++	if (IS_ERR(hw)) {
++		pr_err("%pOFn: failed to register hw lantiq,pmu-xway\n", node);
++		return hw;
++	}
++
++	/*If requested in DT, deactivate the PMU*/
++	/*Read always-on property*/
++	ret = of_property_read_u32( node, "lantiq,disconnect-on-boot", &disconnect_on_boot);
++	if (disconnect_on_boot == 1)
++		ltq_xway_pmu_ops.disable(hw);
++
++	ret = of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw);
++
++	if (ret) {
++		pr_err("%pOFn: failed to add clock provider\n", node);
++	}
++
++
++//DEBUG
++/*
++	pr_info("%pOF:Entering PMU driver\n",node);
++	pr_info("%pOF:\nname=%s\nparent=%s\ngate=0x%08x\ndisconnect_on_boot=%d\nisenabled=0x%08x",node, clk_name,parent_name,mask_gate,disconnect_on_boot, ltq_xway_pmu_ops.is_enabled(hw));
++	pr_info("regval = 0x%08x",clk_pmu_readl(to_clk_ltq_xway_pmu(hw)));
++*/
++//END DEBUG
++	return hw;
++}
++
++
++/**
++ * This is not executed when of_fixed_mmio_clk_setup succeeded.
++ */
++static int of_ltq_xway_pmu_clk_probe(struct platform_device *pdev)
++{
++	struct clk_hw *clk;
++
++	clk = ltq_xway_pmu_clk_setup(pdev->dev.of_node);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	platform_set_drvdata(pdev, clk);
++
++	return 0;
++}
++
++static int of_ltq_xway_pmu_clk_remove(struct platform_device *pdev)
++{
++	struct clk_hw *hw = platform_get_drvdata(pdev);
++
++	of_clk_del_provider (pdev->dev.of_node);
++
++	clk_unregister_ltq_xway_pmu(hw);
++
++	return 0;
++}
++
++
++static void __init of_ltq_xway_pmu_clk_setup(struct device_node *node)
++{
++	ltq_xway_pmu_clk_setup(node);
++}
++CLK_OF_DECLARE(xway_pmu_clk, "lantiq,pmu-xway", of_ltq_xway_pmu_clk_setup);
++
++
++static const struct of_device_id of_ltq_xway_pmu_clk_ids[] = {
++	{ .compatible = "lantiq,pmu-xway" },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(of, of_pmu_clk_ids);
++
++static struct platform_driver of_ltq_xway_pmu_clk_driver = {
++	.driver = {
++		.name = "of_lantiq_fixed_mmio_clk",
++		.of_match_table = of_ltq_xway_pmu_clk_ids,
++	},
++	.probe = 	of_ltq_xway_pmu_clk_probe,
++	.remove =	of_ltq_xway_pmu_clk_remove,
++};
++module_platform_driver(of_ltq_xway_pmu_clk_driver);
++
++MODULE_AUTHOR("Jorge Amorós-Argos <jamoros76@gmail.com>");
++MODULE_DESCRIPTION("Lantiq XWAY PMU clock driver");
++MODULE_LICENSE("GPL v2");
++

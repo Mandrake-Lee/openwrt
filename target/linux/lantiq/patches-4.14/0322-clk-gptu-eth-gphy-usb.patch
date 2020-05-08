@@ -1,0 +1,282 @@
+GPTU driver clk common framework patch
+--- /arch/mips/lantiq/xway/timer.c
++++ /arch/mips/lantiq/xway/timer.c
+@@ -152,15 +152,9 @@
+ 	unsigned int occupation;
+ 	unsigned int f_gptu_on;
+ 	struct timer_dev_timer timer[MAX_NUM_OF_32BIT_TIMER_BLOCKS * 2];
++	struct clk *clk;
+ };
+ 
+-
+-unsigned int ltq_get_fpi_bus_clock(int fpi) {
+-	struct clk *clk = clk_get_fpi();
+-	return clk_get_rate(clk);
+-}
+-
+-
+ static long gptu_ioctl(struct file *, unsigned int, unsigned long);
+ static int gptu_open(struct inode *, struct file *);
+ static int gptu_release(struct inode *, struct file *);
+@@ -180,6 +174,17 @@
+ 
+ static struct timer_dev timer_dev;
+ 
++unsigned long ltq_get_fpi_bus_clock(int fpi) {
++	struct clk *clk;
++
++	if (of_machine_is_compatible ("lantiq,vr9"))
++		clk = timer_dev.clk;
++	else
++		clk = clk_get_fpi();
++
++	return clk_get_rate(clk);
++}
++
+ static irqreturn_t timer_irq_handler(int irq, void *p)
+ {
+ 	unsigned int timer;
+@@ -214,9 +219,11 @@
+ 
+ static inline void lq_enable_gptu(void)
+ {
+-	struct clk *clk = clk_get_sys("1e100a00.gptu", NULL);
+-	clk_enable(clk);
+-
++	if (!IS_ERR(timer_dev.clk))
++		clk_prepare_enable(timer_dev.clk);
++	else
++		panic("Failed to get gptu clock");
++	
+ 	//ltq_pmu_enable(PMU_GPT);
+ 
+ 	/*  Set divider as 1, disable write protection for SPEN, enable module. */
+@@ -232,7 +239,6 @@
+ 
+ static inline void lq_disable_gptu(void)
+ {
+-	struct clk *clk = clk_get_sys("1e100a00.gptu", NULL);
+ 	ltq_w32(0x00, LQ_GPTU_IRNEN);
+ 	ltq_w32(0xfff, LQ_GPTU_IRNCR);
+ 
+@@ -246,7 +252,12 @@
+ 		GPTU_CLC_SPEN_SET(0) |
+ 		GPTU_CLC_DISR_SET(1);
+ 
+-	clk_enable(clk);
++	if (!IS_ERR(timer_dev.clk))
++	/*TODO: it makes more sense to do a clk_disable_unprepare */
++		clk_prepare_enable(timer_dev.clk);
++	else
++		panic("Failed to get gptu clock");
++
+ }
+ 
+ int lq_request_timer(unsigned int timer, unsigned int flag,
+@@ -652,6 +663,9 @@
+ 	u32 clock_divider = 1;
+ 	module_freq = fpi * 1000;
+ 	do_div(module_freq, clock_divider * freq);
++	
++	printk(KERN_INFO "fpi bus freq = %lu", ltq_get_fpi_bus_clock(2));
++
+ 	return module_freq;
+ }
+ EXPORT_SYMBOL(lq_cal_divider);
+@@ -785,6 +799,7 @@
+ 
+ int __init lq_gptu_init(void)
+ {
++	struct device_node *node;
+ 	int ret;
+ 	unsigned int i;
+ 
+@@ -794,6 +809,17 @@
+ 	memset(&timer_dev, 0, sizeof(timer_dev));
+ 	mutex_init(&timer_dev.gptu_mutex);
+ 
++	/* This piece will capture the clock assigned in device tree if available*/
++	if(of_machine_is_compatible("lantiq,vr9")){
++		node = of_find_compatible_node(NULL, NULL, "lantiq,gptu-xway");
++		timer_dev.clk = of_clk_get(node, 0);
++	
++		if(IS_ERR(timer_dev.clk))
++			timer_dev.clk = NULL;
++	}
++	else
++		timer_dev.clk = clk_get_sys("1e100a00.gptu", NULL);
++
+ 	lq_enable_gptu();
+ 	timer_dev.number_of_timers = GPTU_ID_CFG * 2;
+ 	lq_disable_gptu();
+--- /drivers/net/ethernet/lantiq_xrx200.c
++++ /drivers/net/ethernet/lantiq_xrx200.c
+@@ -1527,7 +1527,7 @@
+ 	int i;
+ 
+ 	/* enable clock gate */
+-	clk_enable(hw->clk);
++	clk_prepare_enable(hw->clk);
+ 
+ 	ltq_switch_w32(1, 0);
+ 	mdelay(100);
+@@ -1621,8 +1621,7 @@
+ 	mdiobus_free(hw->mii_bus);
+ 
+ 	/* release the clock */
+-	clk_disable(hw->clk);
+-	clk_put(hw->clk);
++	clk_disable_unprepare(hw->clk);
+ }
+ 
+ static int xrx200_of_mdio(struct xrx200_hw *hw, struct device_node *np)
+@@ -1783,7 +1782,11 @@
+ 	}
+ 
+ 	/* get the clock */
+-	xrx200_hw.clk = clk_get(&pdev->dev, NULL);
++	if (of_machine_is_compatible("lantiq,vr9"))
++		xrx200_hw.clk =of_clk_get(pdev->dev.of_node, 0);
++	else
++		xrx200_hw.clk = clk_get(&pdev->dev, NULL);
++
+ 	if (IS_ERR(xrx200_hw.clk)) {
+ 		dev_err(&pdev->dev, "failed to get clock\n");
+ 		return PTR_ERR(xrx200_hw.clk);
+--- /drivers/phy/lantiq/phy-lantiq-rcu-usb2.c
++++ /drivers/phy/lantiq/phy-lantiq-rcu-usb2.c
+@@ -182,7 +182,11 @@
+ 		priv->ana_cfg1_reg_offset = __be32_to_cpu(*offset);
+ 	}
+ 
+-	priv->phy_gate_clk = devm_clk_get(dev, "phy");
++	if (of_machine_is_compatible("lantiq,vr9"))
++		priv->phy_gate_clk = of_clk_get(dev->of_node,0);
++	else
++		priv->phy_gate_clk = devm_clk_get(dev, "phy");
++
+ 	if (IS_ERR(priv->phy_gate_clk)) {
+ 		dev_err(dev, "Unable to get USB phy gate clk\n");
+ 		return PTR_ERR(priv->phy_gate_clk);
+--- /drivers/soc/lantiq/gphy.c
++++ /drivers/soc/lantiq/gphy.c
+@@ -122,7 +122,10 @@
+ 			break;
+ 		}
+ 
+-	priv->gphy_clk_gate = devm_clk_get(dev, NULL);
++	if (of_machine_is_compatible("lantiq,vr9"))
++		priv->gphy_clk_gate = of_clk_get(dev->of_node, 0);
++	else
++		priv->gphy_clk_gate = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(priv->gphy_clk_gate)) {
+ 		dev_err(dev, "Failed to lookup gate clock\n");
+ 		return PTR_ERR(priv->gphy_clk_gate);
+--- /drivers/tty/serial/lantiq.c
++++ /drivers/tty/serial/lantiq.c
+@@ -313,7 +313,7 @@
+ 	int retval;
+ 
+ 	if (!IS_ERR(ltq_port->clk))
+-		clk_enable(ltq_port->clk);
++		clk_prepare_enable(ltq_port->clk);
+ 	port->uartclk = clk_get_rate(ltq_port->fpiclk);
+ 
+ 	ltq_w32_mask(ASCCLC_DISS | ASCCLC_RMCMASK, (1 << ASCCLC_RMCOFFSET),
+@@ -381,7 +381,7 @@
+ 	ltq_w32_mask(ASCTXFCON_TXFEN, ASCTXFCON_TXFFLU,
+ 		port->membase + LTQ_ASC_TXFCON);
+ 	if (!IS_ERR(ltq_port->clk))
+-		clk_disable(ltq_port->clk);
++		clk_disable_unprepare(ltq_port->clk);
+ }
+ 
+ static void
+@@ -635,7 +635,7 @@
+ 	port = &ltq_port->port;
+ 
+ 	if (!IS_ERR(ltq_port->clk))
+-		clk_enable(ltq_port->clk);
++		clk_prepare_enable(ltq_port->clk);
+ 
+ 	port->uartclk = clk_get_rate(ltq_port->fpiclk);
+ 
+@@ -738,14 +738,21 @@
+ 	port->irq	= irqres[0].start;
+ 	port->mapbase	= mmres->start;
+ 
+-	ltq_port->fpiclk = clk_get_fpi();
++	if(of_machine_is_compatible("lantiq,vr9"))
++		ltq_port->fpiclk = of_clk_get(node, 0);
++	else
++		ltq_port->fpiclk = clk_get_fpi();
++
+ 	if (IS_ERR(ltq_port->fpiclk)) {
+ 		pr_err("failed to get fpi clk\n");
+ 		return -ENOENT;
+ 	}
+ 
+ 	/* not all asc ports have clock gates, lets ignore the return code */
+-	ltq_port->clk = clk_get(&pdev->dev, NULL);
++	if(of_machine_is_compatible("lantiq,vr9"))
++		ltq_port->clk = ltq_port->fpiclk;
++	else
++		ltq_port->clk = clk_get(&pdev->dev, NULL);
+ 
+ 	ltq_port->tx_irq = irqres[0].start;
+ 	ltq_port->rx_irq = irqres[1].start;
+--- /drivers/usb/dwc2/platform.c
++++ /drivers/usb/dwc2/platform.c
+@@ -274,7 +274,12 @@
+ 	}
+ 
+ 	/* Clock */
+-	hsotg->clk = devm_clk_get(hsotg->dev, "otg");
++	/* First try with Device Tree */
++	hsotg->clk = of_clk_get(hsotg->dev->of_node,0);
++	if (IS_ERR(hsotg->clk)){
++		dev_err(hsotg->dev, "No clock attached in Device Tree. Trying devm");
++		hsotg->clk = devm_clk_get(hsotg->dev, "otg");
++	}
+ 	if (IS_ERR(hsotg->clk)) {
+ 		hsotg->clk = NULL;
+ 		dev_dbg(hsotg->dev, "cannot get otg clock\n");
+--- /arch/mips/pci/pci-lantiq.c
++++ /arch/mips/pci/pci-lantiq.c
+@@ -101,7 +101,10 @@
+ 	u32 temp_buffer;
+ 
+ 	/* get our clocks */
+-	clk_pci = clk_get(&pdev->dev, NULL);
++	if (of_machine_is_compatible("lantiq,vr9"))
++		clk_pci = of_clk_get(node, 0);
++	else
++		clk_pci = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk_pci)) {
+ 		dev_err(&pdev->dev, "failed to get pci clock\n");
+ 		return PTR_ERR(clk_pci);
+@@ -115,16 +118,17 @@
+ 	}
+ 
+ 	/* read the bus speed that we want */
+-	bus_clk = of_get_property(node, "lantiq,bus-clock", NULL);
+-	if (bus_clk)
+-		clk_set_rate(clk_pci, *bus_clk);
+-
++	if (!of_machine_is_compatible("lantiq,vr9")){
++		bus_clk = of_get_property(node, "lantiq,bus-clock", NULL);
++		if (bus_clk)
++			clk_set_rate(clk_pci, *bus_clk);
++	}
+ 	/* and enable the clocks */
+-	clk_enable(clk_pci);
++	clk_prepare_enable(clk_pci);
+ 	if (of_find_property(node, "lantiq,external-clock", NULL))
+-		clk_enable(clk_external);
++		clk_prepare_enable(clk_external);
+ 	else
+-		clk_disable(clk_external);
++		clk_disable_unprepare(clk_external);
+ 
+ 	/* setup reset gpio used by pci */
+ 	reset_gpio = of_get_named_gpio(node, "gpio-reset", 0);

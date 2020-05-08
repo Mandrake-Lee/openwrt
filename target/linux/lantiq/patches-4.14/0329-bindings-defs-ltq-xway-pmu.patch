@@ -1,0 +1,73 @@
+--- /dev/null
++++ /include/dt-bindings/clock/lantiq-xway-pmu.h
+@@ -0,0 +1,70 @@
++/*
++ *  This program is free software; you can redistribute it and/or modify it
++ *  under the terms of the GNU General Public License version 2 as published
++ *  by the Free Software Foundation.
++ *
++ *  Copyright (C) 2011-2012 John Crispin <john@phrozen.org>
++ *  Copyright (C) 2013-2015 Lantiq Beteiligungs-GmbH & Co.KG
++ */
++
++/* clock gates that we can en/disable */
++#define PMU_USB0_P	0
++#define PMU_ASE_SDIO	2 /* ASE special */
++#define PMU_PCI		4
++#define PMU_DMA		5
++#define PMU_USB0	6
++#define PMU_ASC0	7
++#define PMU_EPHY	7	/* ase */
++#define PMU_USIF	7 /* from vr9 until grx390 */
++#define PMU_SPI		8
++#define PMU_DFE		9
++#define PMU_EBU		10
++#define PMU_STP		11 /* aka PMU_LEDC */
++#define PMU_GPT		12
++#define PMU_AHBS	13 /* vr9 */
++#define PMU_FPIM	14 /* This is FPI Master */
++#define PMU_AHBM	15
++#define PMU_SDIO	16 /* danube, ar9, vr9 */
++#define PMU_ASC1	17
++#define PMU_PPE_QSB	18
++#define PMU_PPE_SLL01	19
++#define PMU_DEU		20
++#define PMU_PPE_TC	21
++#define PMU_PPE_EMA	22
++#define PMU_PPE_DPLUM	23
++#define PMU_PPE_DP	24
++#define PMU_PPE_DPLUS	24
++#define PMU_USB1_P	26
++#define PMU_USB1	27
++#define PMU_SWITCH	28
++#define PMU_PPE_TOP	29 /* aka PMU_GPHY0 or PMU_DDR_DPD */
++#define PMU_GPHY	30 /* aka PMU_GPHY1 */
++#define PMU_PCIE_CLK	31
++
++#define PMU1_PCIE_PHY	0	/* vr9-specific,moved in ar10/grx390 */
++#define PMU1_PCIE_CTL	1
++#define PMU1_PCIE_PDI	4
++#define PMU1_PCIE_MSI	5
++#define PMU1_CKE	6
++#define PMU1_PCIE1_CTL	17
++#define PMU1_PCIE1_PDI	20
++#define PMU1_PCIE1_MSI	21
++#define PMU1_PCIE2_CTL	25
++#define PMU1_PCIE2_PDI	26
++#define PMU1_PCIE2_MSI	27
++
++#define PMU_ANALOG_USB0_P	0
++#define PMU_ANALOG_USB1_P	1
++#define PMU_ANALOG_PCIE0_P	8
++#define PMU_ANALOG_PCIE1_P	9
++#define PMU_ANALOG_PCIE2_P	10
++#define PMU_ANALOG_DSL_AFE	16
++#define PMU_ANALOG_DCDC_2V5	17
++#define PMU_ANALOG_DCDC_1VX	18
++#define PMU_ANALOG_DCDC_1V0	19
++
++/* The following definitions come after analysis of ifx_pmu.h */
++#define PMU_FPIS	1
++#define PMU_DFEV1	3
++#define PMU_TDM		25
++

@@ -1,0 +1,982 @@
+// SPDX-License-Identifier: GPL-2.0
+
+/*
+ * Copyright 2020 by Jorge Amorós-Argos <joramar76@gmail.com>
+ */
+
+#include <dt-bindings/clock/lantiq-xway-pmu.h>
+/ {
+	clocks{
+		/* This is the xtal present on the board */
+		osc:oscillator {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <36000000>;	/*Default 36MHz*/
+			clock-output-names = "osc";
+		};
+
+		/*
+		 * The PMU unit looks like sometimes it's gating a clock signal but
+		 * sometimes it's gating a power signal i.e. affecting the whole module
+		 * For those cases, and for the sake of a better readability
+		 * we add this dummy clock
+		 */
+		dummy_osc:dummy_osc {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <0>;
+			clock-output-names = "dummy";
+		};
+
+		/* Some GPIO's named clkoutx are capable of providing clock signals
+		 * These frequencies seem to be driven by CPU with some predetermined
+		 * values that we're modelizing as fixed-clocks sources below
+		 */
+		gpio_freq0:gpio_freq0 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <32768>;	/* 32.768 KHz*/
+			clock-output-names = "gpio_freq0";
+		};
+
+		gpio_freq1:gpio_freq1 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <1536000>;	/* 1.536 MHz*/
+			clock-output-names = "gpio_freq1";
+		};
+
+		gpio_freq2:gpio_freq2 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <2500000>;	/* 2.5 MHz*/
+			clock-output-names = "gpio_freq2";
+		};
+
+		gpio_freq3:gpio_freq3 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <12000000>;	/* 12 MHz*/
+			clock-output-names = "gpio_freq3";
+		};
+
+		gpio_freq4:gpio_freq4 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <24000000>;	/* 24 MHz*/
+			clock-output-names = "gpio_freq4";
+		};
+
+		gpio_freq5:gpio_freq5 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <25000000>;	/* 25 MHz*/
+			clock-output-names = "gpio_freq5";
+		};
+
+		gpio_freq6:gpio_freq6 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <30000000>;	/* 30 MHz*/
+			clock-output-names = "gpio_freq6";
+		};
+
+		gpio_freq7:gpio_freq7 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <40000000>;	/* 40 MHz*/
+			clock-output-names = "gpio_freq7";
+		};
+
+		gpio_freq8:gpio_freq8 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <48000000>;	/* 48 MHz*/
+			clock-output-names = "gpio_freq8";
+		};
+
+		gpio_freq9:gpio_freq9 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <50000000>;	/* 50 MHz*/
+			clock-output-names = "gpio_freq9";
+		};
+
+		gpio_freq10:gpio_freq10 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <60000000>;	/* 60 MHz*/
+			clock-output-names = "gpio_freq10";
+		};
+
+		/* Now comes a series of dividers*/
+
+		osc_div3: osc_div3{
+			compatible = "fixed-factor-clock";
+			clocks = <&osc>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <3>;
+			clock-output-names = "osc_div3";
+		};	//12MHz
+
+		pll0_div10: pll0_div10{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0 0>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <10>;
+			clock-output-names = "pll0_div10";
+		};	//100MHz
+
+		pll0_ps1_div4: pll0_ps1_div4{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps1>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <4>;
+			clock-output-names = "pll0_ps1_div4";
+		};	//125MHz
+
+		pll0_ps1_div8: pll0_ps1_div8{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps1>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <8>;
+			clock-output-names = "pll0_ps1_div8";
+		};	//62.5MHz
+
+		pll0_ps1_div10: pll0_ps1_div10{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps1>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <10>;
+			clock-output-names = "pll0_ps1_div10";
+		};	//50MHz
+
+		pll0_ps1_div15: pll0_ps1_div15{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps1>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <15>;
+			clock-output-names = "pll0_ps1_div15";
+		};	//33.3MHz
+
+		pll0_ps1_div20: pll0_ps1_div20{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps1>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <20>;
+			clock-output-names = "pll0_ps1_div20";
+		};	//25MHz
+
+		pll0_ps1_div200: pll0_ps1_div200{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps1>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <200>;
+			clock-output-names = "pll0_ps1_div200";
+		};	//2.5MHz
+
+		pll0_ps2_div2: pll0_ps2_div2{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps2>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <2>;
+			clock-output-names = "pll0_ps2_div2";
+		};	//333MHz
+
+		pll0_ps2_div4: pll0_ps2_div4{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps2>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <4>;
+			clock-output-names = "pll0_ps2_div4";
+		};	//166MHz
+
+		pll0_ps3_div3: pll0_ps3_div3{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll0_ps3>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <3>;
+			clock-output-names = "pll0_ps3_div3";
+		};	//200MHz
+
+		pll2_div2: pll2_div2{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll2 0>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <2>;
+			clock-output-names = "pll2_div2";
+		};	//432MHz
+
+		pll2_div3: pll2_div3{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll2 0>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <3>;
+			clock-output-names = "pll2_div3";
+		};	//288MHz
+
+		pll2_div36: pll2_div36{
+			compatible = "fixed-factor-clock";
+			clocks = <&pll2 0>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <36>;
+			clock-output-names = "pll2_div36";
+		};	//24MHz
+
+		cpu_div2: cpu_div2{
+			compatible = "fixed-factor-clock";
+			clocks = <&cpu_mux>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <2>;
+			clock-output-names = "cpu_div2";
+		};
+
+		ocp_div2: ocp_div2{
+			compatible = "fixed-factor-clock";
+			clocks = <&ocp_mux>;
+			#clock-cells = <0>;
+			clock-mult = <1>;
+			clock-div = <2>;
+			clock-output-names = "ocp_div2";
+		};
+
+	};
+};
+
+&pmu0 {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	compatible = "simple-bus";
+	reg = <0x102000 0x1000>;
+	ranges = <0x0 0x102000 0x1000>;
+	big-endian;
+
+	/*This is the first power control register*/		
+	pmu_pwdcr0: pmu_pwdcr0@1c{
+		reg = <0x1c 4>;
+	};
+
+	/*This is the 1st power status register*/
+	pmu_pwdsr0: pmu_pwdsr0@20{
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "simple-bus";
+		reg = <0x20 4>;
+		ranges = <0 0x20 4>;
+
+		usb0_phy_pmu: gate@0{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&usb_mux>;
+			clock-output-names = "usb0_phy";
+			/* For VR9, both enable & disable control regs are the same */
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_USB0_P>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		fpis_pmu: gate@1{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&fpis_mux>;
+			clock-output-names = "fpis";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_FPIS>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		pci_pmu: gate@4{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pci_mux>;
+			clock-output-names = "pci_pmu";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_PCI>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		dma_pmu: gate@5{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&ocp_mux>;
+			clock-output-names = "dma";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_DMA>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		usb0_otg_pmu: gate@6{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&usb_mux>;
+			clock-output-names = "usb0_otg";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_USB0>, <PMU_AHBM>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		usif_pmu: gate@7{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pll0_div10>;
+			clock-output-names = "usif";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_USIF>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		spi_pmu: gate@8{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&fpim_mux>;
+			clock-output-names = "spi";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_SPI>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		dfe_pmu: gate@9{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&dummy_osc>;
+			clock-output-names = "dfe";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_DFE>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		ebu_pmu: gate@10{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pci_mux>;
+			clock-output-names = "ebu";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_EBU>;
+			lantiq,disconnect-on-boot = <0>;
+		};
+
+		gpt_pmu: gate@12{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&fpim_mux>;
+			clock-output-names = "gpt";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_GPT>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		stp_pmu: gate@13{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&dummy_osc>;
+			clock-output-names = "stp";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_STP>;
+			lantiq,disconnect-on-boot = <1>;
+		};	//This device is directly connected to fpim clock
+
+		fpim_pmu: gate@14{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&fpim_mux>;
+			clock-output-names = "fpim";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_FPIM>;
+			lantiq,disconnect-on-boot = <0>;
+		};
+
+		ahb_pmu: gate@15{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&ocp_mux>;
+			clock-output-names = "ahb";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_AHBM>, <PMU_AHBS>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		sdio_pmu: gate@16{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&dummy_osc>;
+			clock-output-names = "sdio";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_SDIO>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		asc1_pmu: gate@17{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&ocp_mux>;
+			clock-output-names = "asc1";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_ASC1>;
+			lantiq,disconnect-on-boot = <0>;
+		};
+
+		deu_pmu: gate@20{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&dummy_osc>;
+			clock-output-names = "deu";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_DEU>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		eth0_pmu: gate@21{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&eth_mux>;
+			clock-output-names = "eth0";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_SWITCH>, <PMU_PPE_DPLUS>, <PMU_PPE_DPLUM>,
+						<PMU_PPE_EMA>, <PMU_PPE_TC>, <PMU_PPE_SLL01>,
+						<PMU_PPE_QSB>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		usb1_phy_pmu: gate@26{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&usb_mux>;
+			clock-output-names = "usb1_phy";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_USB1_P>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		usb1_otg_pmu: gate@27{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&usb_mux>;
+			clock-output-names = "usb1_otg";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_USB1>, <PMU_AHBM>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		gphy0_pmu: gate@29{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&gphy_mux>;
+			clock-output-names = "gphy0";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_PPE_TOP>;
+			lantiq,disconnect-on-boot = <1>;
+		};	//See ifx_pmu.h
+
+		gphy1_pmu: gate@30{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&gphy_mux>;
+			clock-output-names = "gphy1";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_GPHY>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		pcie_bus_pmu: gate@31{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pll0 0>;	//TODO: Investigate origin
+			clock-output-names = "bus";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr0>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr0>;
+			lantiq,gate-bit-pos = <PMU_PCIE_CLK>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+	};
+
+	/*This is the 2nd power control register*/		
+	pmu_pwdcr1: pmu_pwdcr1@24{
+		reg = <0x24 4>;
+	};
+
+	/*This is the 2nd power status register*/
+	pmu_pwdsr1: pmu_pwdsr1@28{
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "simple-bus";
+		reg = <0x28 4>;
+		ranges = <0 0x28 4>;
+
+		pcie_phy_pmu: gate@0{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pll0_ps1>;	//TODO: investigate origin
+			clock-output-names = "pcie_phy";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr1>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr1>;
+			lantiq,gate-bit-pos = <PMU1_PCIE_PHY>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		pcie_ctl_pmu: gate@1{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pll0_ps1>;	//TODO: investigate origin
+			clock-output-names = "pcie_ctl";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr1>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr1>;
+			lantiq,gate-bit-pos = <PMU1_PCIE_CTL>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		pcie_pdi_pmu: gate@4{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pll0_ps1>;	//TODO: investigate origin
+			clock-output-names = "pcie_pdi";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr1>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr1>;
+			lantiq,gate-bit-pos = <PMU1_PCIE_PDI>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+		pcie_msi_pmu: gate@5{
+			reg = <0 4>;
+			compatible = "lantiq,pmu-xway";
+			big-endian;
+			#clock-cells = <0>;
+			clocks = <&pll0_ps1>;	//TODO: investigate origin
+			clock-output-names = "pcie_msi";
+			lantiq,pmu-enable-reg = <&pmu_pwdcr1>;
+			lantiq,pmu-disable-reg = <&pmu_pwdcr1>;
+			lantiq,gate-bit-pos = <PMU1_PCIE_MSI>;
+			lantiq,disconnect-on-boot = <1>;
+		};
+
+	};
+};
+
+&cgu0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "lantiq,cgu-xway","simple-bus";
+		reg = <0x103000 0x1000>;
+		ranges = <0x0 0x103000 0x1000>;
+
+		pll0: pll@04 {
+			compatible = "lantiq,pll-xway";
+			reg = <0x04 4>;
+			big-endian;
+			lantiq,pll-type = <0>;
+			#clock-cells = <1>;
+			clocks = <&osc>;
+			clock-output-names = "pll0";
+			/*
+			 * The following fixed rate dividers are physically inside
+			 * pll0, all three named "Phased Shifters "
+			 * ps1 and ps2 can be enable/disable via bit register
+			 * However the model shown here is simplified although fully useful
+			 */
+			pll0_ps1: pll0_ps1{
+				compatible = "fixed-factor-clock";
+				clocks = <&pll0 0>;
+				#clock-cells = <0>;
+				clock-mult = <1>;
+				clock-div = <2>;
+				clock-output-names = "pll0_ps1";
+			};	//Typ. 500MHz
+
+			pll0_ps2: pll0_ps2{
+				compatible = "fixed-factor-clock";
+				clocks = <&pll0 0>;
+				#clock-cells = <0>;
+				clock-mult = <2>;
+				clock-div = <3>;
+				clock-output-names = "pll0_ps2";
+			};	//Typ. 666MHz
+
+			pll0_ps3: pll0_ps3{
+				compatible = "fixed-factor-clock";
+				clocks = <&pll0 0>;
+				#clock-cells = <0>;
+				clock-mult = <6>;
+				clock-div = <10>;
+				clock-output-names = "pll0_ps3";
+			};	//Typ. 600MHz
+		};	//Set at UBOOT, typically 1000MHz, 500MHz, 666MHz and 600MHz
+
+		pll1: pll@08 {
+			compatible = "lantiq,pll-xway";
+			reg = <0x08 4>;
+			big-endian;
+			lantiq,pll-type = <1>;
+			#clock-cells = <1>;
+			clocks = <&osc>;
+			clock-output-names = 	"pll1",	"pll1_div";
+		};	//Set at UBOOT, typ. 393.219MHz
+
+		cgu_sys: cgu_sys@0c {
+			reg = <0x0c 4>;
+			compatible = "simple-bus";
+			big-endian;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0x0 0x0c 4>;
+
+			ocp_mux: mux@0{
+				reg = <0 4>;
+				compatible = "lantiq,mmio-mux-clock";
+				big-endian;
+				#clock-cells = <0>;
+				lantiq,mux-mask = <0xF>;
+				lantiq,mux-shift = <0>;
+				clocks = <&cpu_mux>, <&cpu_div2>, <&pll0_ps3_div3>;
+				clock-output-names = "ocp_mux";
+				#lantiq,mux-table-cells = <2>;
+				lantiq,mux-table =
+				/*	val	input_clock*/
+					<0	0>,
+					<2	1>,
+					<3	2>;
+			};	//typically cpu_mux x 1/2 = 250MHz
+
+			cpu_mux: mux@1{
+				reg = <0 4>;
+				compatible = "lantiq,mmio-mux-clock";
+				big-endian;
+				#clock-cells = <0>;
+				lantiq,mux-mask = <0xF>;
+				lantiq,mux-shift = <4>;
+				clocks = 	<&pll0_ps3>,	<&pll0_ps1>,
+						<&pll1 0>,	<&pll0_ps2_div2>,
+						<&pll0_ps2_div4>;
+				clock-output-names = "cpu_mux";
+				#lantiq,mux-table-cells = <2>;
+				lantiq,mux-table =
+				/*	val	input_clock*/
+					<0	0>,
+					<1	1>,
+					<2	2>,
+					<3	3>,
+					<8	4>;
+			};	//typically pll0_ps1 = 500MHz
+
+
+		};
+
+	cgu_clkfsr: cgu_clkfsr@10 {
+		reg = <0x10 4>;
+		compatible = "simple-bus";
+		big-endian;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x10 4>;
+
+		fpis_mux: mux@0{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			#clock-cells = <0>;
+			big-endian;
+			lantiq,mux-mask =<0x1>;
+			lantiq,mux-shift = <5>;
+			clocks = <&ocp_mux>, <&ocp_div2>;
+			clock-output-names = "fpi_s";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>;
+		};	//typically ocp_mux = 250MHz
+
+		fpim_mux: mux@1{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			#clock-cells = <0>;
+			big-endian;
+			lantiq,mux-mask =<0x1>;
+			lantiq,mux-shift = <6>;
+			clocks = <&ocp_mux>, <&ocp_div2>;
+			clock-output-names = "fpi_m";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>;
+		};	//typically ocp_mux = 250MHz
+
+		ppe_mux: mux@2{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			#clock-cells = <0>;
+			big-endian;
+			lantiq,mux-mask =<0x7>;
+			lantiq,mux-shift = <16>;
+			clocks = <&pll0_ps1>, <&pll2_div2>, <&pll2_div3>;
+			clock-output-names = "ppe_mux";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>,
+				<2	2>;
+		};	//typically pll2 x 1/2 = 432MHz
+
+		eth_mux: mux@3{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			#clock-cells = <0>;
+			big-endian;
+			lantiq,mux-mask =<0x7>;
+			lantiq,mux-shift = <24>;
+			clocks = <&pll0_ps1_div10>, <&pll0_ps1_div20>,
+				<&pll0_ps1_div200>, <&pll0_ps1_div4>;
+			clock-output-names = "eth_mux";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>,
+				<2	2>,
+				<3	3>;
+		};	//This is set at U-Boot, typically 125MHz
+
+
+	};
+	if_clk: if_clk@24 {
+		reg = <0x24 4>;
+		compatible = "simple-bus";
+		big-endian;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		#clock-cells = <1>;
+		ranges = <0x0 0x24 4>;
+
+		usb_mux: mux@0{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0x3>;
+			lantiq,mux-shift = <0>;
+			clocks = <&osc>, <&osc_div3>;
+			clock-output-names = "usb_mux";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-default-val = <3>;	//Default x1/3 osc = 12MHz
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<1	0>,
+				<3	1>;
+		};	//This is set with this driver
+
+		gphy_mux: mux@1{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0x7>;
+			lantiq,mux-shift = <2>;
+			clocks = <&osc>, <&pll0_ps1_div20>,
+				<&pll2_div36>, <&clkout2>;
+			clock-output-names = "gphy_mux";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<1	0>,	// 36MHz
+				<2	1>,	// 25MHz
+				<3	2>,	// 24MHz
+				<4	3>;	// Typ. 25MHz (GPIO)
+		};	//This is set at U-Boot, typically 25MHz (val = 2)
+
+		clkout3: mux@2{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0x3>;
+			lantiq,mux-shift = <8>;
+			clocks = <&gpio_freq3>, <&gpio_freq9>,
+				<&gpio_freq0>, <&gpio_freq5>;
+			clock-output-names = "clkout3";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>,
+				<2	2>,
+				<3	3>;
+		};	//This is a GPIO driving a CPU-generated? clock signal
+
+		clkout2: mux@3{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0x3>;
+			lantiq,mux-shift = <10>;
+			clocks = <&gpio_freq5>, <&gpio_freq7>,
+				<&gpio_freq6>, <&gpio_freq10>;
+			clock-output-names = "clkout2";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>,
+				<2	2>,
+				<3	3>;
+		};	//This is a GPIO driving a CPU-generated? clock signal
+
+		clkout1: mux@4{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0x3>;
+			lantiq,mux-shift = <12>;
+			clocks = <&gpio_freq7>, <&gpio_freq3>,
+				<&gpio_freq4>, <&gpio_freq8>;
+			clock-output-names = "clkout1";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>,
+				<2	2>,
+				<3	3>;
+		};	//This is a GPIO driving a CPU-generated? clock signal
+
+		clkout0: mux@5{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0x3>;
+			lantiq,mux-shift = <14>;
+			clocks = <&gpio_freq0>, <&gpio_freq1>,
+				<&gpio_freq2>, <&gpio_freq3>;
+			clock-output-names = "clkout0";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0	0>,
+				<1	1>,
+				<2	2>,
+				<3	3>;
+		};	//This is a GPIO driving a CPU-generated? clock signal
+
+
+		pci_mux: mux@6{
+			reg = <0 4>;
+			compatible = "lantiq,mmio-mux-clock";
+			big-endian;
+			#clock-cells = <0>;
+			lantiq,mux-mask= <0xF>;
+			lantiq,mux-shift = <20>;
+			clocks = <&pll0_ps1_div8>	,<&pll0_ps1_div15>;
+			clock-output-names = "pci_mux";
+			#lantiq,mux-table-cells = <2>;
+			lantiq,mux-default-val = <0xe>;	//Default 33MHz
+			lantiq,mux-table =
+			/*	val	input_clock*/
+				<0x7	0>,		// 33MHz
+				<0xe	1>;		// 62.5MHz
+		};	//This is set with this driver
+	};
+
+	cpu_temp: gphy1_cfg@40{
+		reg = <0x40 4>;
+		big-endian;
+	};	//TODO: Make ltq-cputemp.c work here
+
+	pll2: pll@60 {
+		compatible = "lantiq,pll-xway";
+		reg = <0x60 4>;
+		big-endian;
+		lantiq,pll-type = <2>;
+		#clock-cells = <1>;
+		clocks = <&osc>;
+		clock-output-names = "pll2";
+	};	// Set at UBOOT, typ. 864MHz
+};
+

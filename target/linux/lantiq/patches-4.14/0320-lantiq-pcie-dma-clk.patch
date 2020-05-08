@@ -1,0 +1,160 @@
+--- /arch/mips/lantiq/xway/dma.c
++++ /arch/mips/lantiq/xway/dma.c
+@@ -216,6 +216,7 @@
+ static int
+ ltq_dma_init(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	struct clk *clk;
+ 	struct resource *res;
+ 	unsigned id;
+@@ -227,11 +228,15 @@
+ 		panic("Failed to remap dma resource");
+ 
+ 	/* power up and reset the dma engine */
+-	clk = clk_get(&pdev->dev, NULL);
++	if (of_machine_is_compatible("lantiq,vr9"))
++		clk =of_clk_get(np, 0);
++	else
++		clk = clk_get(&pdev->dev, NULL);
++
+ 	if (IS_ERR(clk))
+ 		panic("Failed to get dma clock");
+ 
+-	clk_enable(clk);
++	clk_prepare_enable(clk);
+ 	ltq_dma_w32_mask(0, DMA_RESET, LTQ_DMA_CTRL);
+ 
+ 	/* disable all interrupts */
+--- /arch/mips/pci/ifxmips_pcie_vr9.h
++++ /arch/mips/pci/ifxmips_pcie_vr9.h
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/gpio.h>
+ #include <lantiq_soc.h>
++#include <linux/clk-provider.h>
+ 
+ #define IFX_REG_R32    ltq_r32
+ #define IFX_REG_W32    ltq_w32
+@@ -53,13 +54,14 @@
+ 
+ static inline void pcie_ahb_pmu_setup(void) 
+ {
+-	/* Enable AHB bus master/slave */
++	struct device_node *node;
+ 	struct clk *clk;
+-	clk = clk_get_sys("1d900000.pcie", "ahb");
+-	clk_enable(clk);
+ 
+-    //AHBM_PMU_SETUP(IFX_PMU_ENABLE);
+-    //AHBS_PMU_SETUP(IFX_PMU_ENABLE);
++	node = of_find_compatible_node(NULL, NULL, "lantiq,pcie-xrx200");
++	clk = of_clk_get_by_name(node,"ahb");
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
++
+ }
+ 
+ static inline void pcie_rcu_endian_setup(int pcie_port)
+@@ -82,20 +84,27 @@
+ 
+ static inline void pcie_phy_pmu_enable(int pcie_port)
+ {
++	struct device_node *node;
+ 	struct clk *clk;
+-	clk = clk_get_sys("1d900000.pcie", "phy");
+-	clk_enable(clk);
+ 
+-	//PCIE_PHY_PMU_SETUP(IFX_PMU_ENABLE);
++	node = of_find_compatible_node(NULL, NULL, "lantiq,pcie-xrx200");
++	clk = of_clk_get_by_name(node,"phy");
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
++
+ }
+ 
+ static inline void pcie_phy_pmu_disable(int pcie_port)
+ {
++	struct device_node *node;
+ 	struct clk *clk;
+-	clk = clk_get_sys("1d900000.pcie", "phy");
+-	clk_disable(clk);
+ 
+-//    PCIE_PHY_PMU_SETUP(IFX_PMU_DISABLE);
++	node = of_find_compatible_node(NULL, NULL, "lantiq,pcie-xrx200");
++
++	clk = of_clk_get_by_name(node,"phy");
++
++	if (!IS_ERR(clk) && __clk_is_enabled(clk))
++		clk_disable_unprepare(clk);
+ }
+ 
+ static inline void pcie_pdi_big_endian(int pcie_port)
+@@ -111,11 +120,16 @@
+ 
+ static inline void pcie_pdi_pmu_enable(int pcie_port)
+ {
+-    /* Enable PDI to access PCIe PHY register */
++	struct device_node *node;
+ 	struct clk *clk;
+-	clk = clk_get_sys("1d900000.pcie", "pdi");
+-	clk_enable(clk);
+-    //PDI_PMU_SETUP(IFX_PMU_ENABLE);
++
++	node = of_find_compatible_node(NULL, NULL, "lantiq,pcie-xrx200");
++
++	clk = of_clk_get_by_name(node,"pdi");
++
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
++
+ }
+ 
+ static inline void pcie_core_rst_assert(int pcie_port)
+@@ -165,26 +179,35 @@
+ 
+ static inline void pcie_core_pmu_setup(int pcie_port)
+ {
++	struct device_node *node;
+ 	struct clk *clk;
+-	clk = clk_get_sys("1d900000.pcie", "ctl");
+-	clk_enable(clk);
+-	clk = clk_get_sys("1d900000.pcie", "bus");
+-	clk_enable(clk);
+ 
+-    /* PCIe Core controller enabled */
+-//    PCIE_CTRL_PMU_SETUP(IFX_PMU_ENABLE);
++	node = of_find_compatible_node(NULL, NULL, "lantiq,pcie-xrx200");
+ 
+-    /* Enable PCIe L0 Clock */
+-//  PCIE_L0_CLK_PMU_SETUP(IFX_PMU_ENABLE);
++	clk = of_clk_get_by_name(node,"ctl");
++
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
++
++	clk = of_clk_get_by_name(node,"bus");
++
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
+ }
+ 
+ static inline void pcie_msi_init(int pcie_port)
+ {
++	struct device_node *node;
+ 	struct clk *clk;
++
+ 	pcie_msi_pic_init(pcie_port);
+-	clk = clk_get_sys("ltq_pcie", "msi");
+-	clk_enable(clk);
+-//    MSI_PMU_SETUP(IFX_PMU_ENABLE);
++
++	node = of_find_compatible_node(NULL, NULL, "lantiq,pcie-xrx200");
++
++	clk = of_clk_get_by_name(node,"msi");
++
++	if (!IS_ERR(clk))
++		clk_prepare_enable(clk);
+ }
+ 
+ static inline u32

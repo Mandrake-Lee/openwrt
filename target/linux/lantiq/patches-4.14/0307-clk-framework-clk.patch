@@ -1,0 +1,79 @@
+--- /arch/mips/lantiq/clk.c
++++ /arch/mips/lantiq/clk.c
+@@ -15,6 +15,7 @@
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
+ #include <linux/list.h>
++#include <linux/clk-provider.h>
+ 
+ #include <asm/time.h>
+ #include <asm/irq.h>
+@@ -36,7 +37,7 @@
+ 	cpu_clk_generic[2].rate = io;
+ 	cpu_clk_generic[3].rate = ppe;
+ }
+-
++#ifndef CONFIG_COMMON_CLK
+ struct clk *clk_get_cpu(void)
+ {
+ 	return &cpu_clk_generic[0];
+@@ -159,6 +160,50 @@
+ 		clk->deactivate(clk);
+ }
+ EXPORT_SYMBOL(clk_deactivate);
++#else
++/*
++ * Queries the device tree for the CPU clock assigned
++ */
++
++struct clk* clk_get_cpu(){
++	struct device_node *cpu_node;
++	struct clk *cpu_clk;
++
++	cpu_node = of_get_cpu_node(0, NULL);
++	of_node_put(cpu_node);
++	
++	if (!cpu_node) {
++		pr_err("Failed to get CPU node, trying hardcode path\n");
++
++		cpu_node =of_find_node_by_path("/cpus/cpu@0");
++		if (!cpu_node)
++			pr_err("Failed hardcoded CPU node");
++	}
++
++	cpu_clk = of_clk_get(cpu_node, 0);
++	if (IS_ERR(cpu_clk)) {
++		pr_err("Failed to get CPU clock: %ld\n", PTR_ERR(cpu_clk));
++		return NULL;
++	}
++	
++	return cpu_clk;
++}
++
++/*
++ * Dummy functions to keep compilation going
++ * Once all XWAY SoC's have been migrated to Common Clock Framework
++ * and therefore all the Device Tree are updated, these functions and above
++ * ones are useless and therefore need to be cleansed
++ */
++struct clk* clk_get_fpi(){
++	return NULL;
++}
++struct clk* clk_get_io(){
++	return NULL;
++}
++
++#endif
++
+ 
+ static inline u32 get_counter_resolution(void)
+ {
+@@ -179,6 +224,8 @@
+ void __init plat_time_init(void)
+ {
+ 	struct clk *clk;
++	
++	of_clk_init(NULL);
+ 
+ 	ltq_soc_init();
+ 

@@ -1,0 +1,14 @@
+--- /drivers/watchdog/lantiq_wdt.c
++++ /drivers/watchdog/lantiq_wdt.c
+@@ -263,7 +263,10 @@
+ 	}
+ 
+ 	/* we do not need to enable the clock as it is always running */
+-	clk = clk_get_io();
++	if (of_machine_is_compatible("lantiq,vr9"))
++		clk = of_clk_get(pdev->dev.of_node, 0);
++	else
++		clk = clk_get_io();
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "Failed to get clock\n");
+ 		return -ENOENT;
