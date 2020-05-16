@@ -1,0 +1,87 @@
+--- a/src/drivers/driver.h
++++ b/src/drivers/driver.h
+@@ -5605,6 +5605,10 @@
+ /* driver_atheros.c */
+ extern const struct wpa_driver_ops wpa_driver_atheros_ops;
+ #endif /* CONFIG_DRIVER_ATHEROS */
++#ifdef CONFIG_DRIVER_MTLK
++/* driver_mtlk.c */
++extern const struct wpa_driver_ops wpa_driver_mtlk_ops;
++#endif /* CONFIG_DRIVER_MTLK */
+ #ifdef CONFIG_DRIVER_NONE
+ extern const struct wpa_driver_ops wpa_driver_none_ops; /* driver_none.c */
+ #endif /* CONFIG_DRIVER_NONE */
+--- a/src/drivers/driver_mtlk.c
++++ b/src/drivers/driver_mtlk.c
+@@ -20,12 +20,12 @@
+ #include <netlink/netlink.h>
+ #include <netlink/genl/genl.h>
+ #include <netlink/genl/ctrl.h>
++#include <linux/rtnetlink.h>
+ 
+ #include "common.h"
+ #include "driver.h"
+ #include "driver_wext.h"
+ #include "eloop.h"
+-#include "common/ieee802_11_defs.h"
+ #include "linux_wext.h"
+ 
+ #include "netlink.h"
+@@ -70,7 +70,7 @@
+ typedef struct _mtlk_nlink_socket_t
+ {
+   int family;
+-  struct nl_handle *sock;
++  struct nl_sock *sock;
+   mtlk_netlink_callback_t receive_callback;
+   void* receive_callback_ctx;
+ } mtlk_nlink_socket_t;
+@@ -1109,9 +1109,9 @@
+     event.rx_probe_req.sa = mgmt->sa;
+     event.rx_probe_req.da = mgmt->da;
+     event.rx_probe_req.bssid = mgmt->bssid;
+-    event.rx_probe_req.ie = mgmt->u.probe_req.variable;
++    event.rx_probe_req.ie = event.rx_mgmt.frame + IEEE80211_HDRLEN;	//mgmt->u.probe_req.variable;
+     event.rx_probe_req.ie_len =
+-          phdr->data_len - (IEEE80211_HDRLEN + sizeof(mgmt->u.probe_req));
++          phdr->data_len - IEEE80211_HDRLEN;
+     /*pass probe request event to hostapd: */
+     wpa_supplicant_event(drv->hapd, EVENT_RX_PROBE_REQ, &event);
+   break;
+@@ -1221,7 +1221,7 @@
+     int enabled=1;
+     int res=0;
+ 
+-    nlink_socket->sock = nl_handle_alloc();
++    nlink_socket->sock = nl_socket_alloc();	//nl_handle_alloc();
+     if (NULL == nlink_socket->sock) {
+       MTLK_PRINT("Generic netlink socket allocation failed");
+       res = -1;
+@@ -1257,7 +1257,8 @@
+   /* This socket have to process all messages and not 
+      only explicitly requested as it is should be in 
+      event processing */
+-  nl_disable_sequence_check(nlink_socket->sock);
++  nl_socket_disable_seq_check(nlink_socket->sock);
++  //nl_disable_sequence_check(nlink_socket->sock);
+   
+   MTLK_PRINT("gnl debug: use nl_socket_modify_cb\n");
+   /* set callback for all valid messages */
+@@ -1266,7 +1267,7 @@
+   goto end;
+ 
+ err_dealloc:
+-  nl_handle_destroy(nlink_socket->sock);
++  nl_socket_free(nlink_socket->sock);	//nl_handle_destroy(nlink_socket->sock);
+ end:
+   return res;
+ }
+@@ -1283,7 +1284,7 @@
+ 		return;
+ 	if (netlink->sock >= 0) {
+ 		eloop_unregister_read_sock(nl_socket_get_fd(netlink->sock));
+-		nl_handle_destroy(netlink->sock);
++		nl_socket_free(netlink->sock);	//nl_handle_destroy(netlink->sock);
+ 	}
+ 	os_free(netlink);
+ }
